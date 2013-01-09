@@ -45,7 +45,6 @@ THE SOFTWARE.
 #include <bps/orientation.h>
 #include <bps/sensor.h>
 #include <bps/virtualkeyboard.h>
-#include <bps/paymentservice.h>
 
 #include <stdlib.h>
 
@@ -86,7 +85,6 @@ CCEGLView::CCEGLView()
     snprintf(m_windowGroupID, sizeof(m_windowGroupID), "%d", getpid());
     bps_initialize();
     navigator_request_events(0);
-    paymentservice_request_events(0);
 
     static const int SENSOR_RATE = 25000;
     sensor_set_rate(SENSOR_TYPE_ACCELEROMETER, SENSOR_RATE);
@@ -771,66 +769,6 @@ bool CCEGLView::handleEvents()
                 CCDirector::sharedDirector()->getAccelerometer()->update(current_time, -x, -y, z);
             }
         }
-        else if (bps_event_get_domain(event) == paymentservice_get_domain())
-	    {
-	        if (SUCCESS_RESPONSE == paymentservice_event_get_response_code(event))
-	        {
-				if (PURCHASE_RESPONSE == bps_event_get_code(event))
-				{
-				    if (event == NULL)
-				    {
-				        fprintf(stderr, "Invalid event.\n");
-				        break;
-				    }
-
-					// Handle a successful purchase here
-					const char* digital_good = paymentservice_event_get_digital_good_id(event, 0);
-					const char* digital_sku = paymentservice_event_get_digital_good_sku(event, 0);
-
-				    unsigned request_id = paymentservice_event_get_request_id(event);
-				    const char* date = paymentservice_event_get_date(event, 0);
-				    const char* license_key = paymentservice_event_get_license_key(event, 0);
-				    const char* metadata = paymentservice_event_get_metadata(event, 0);
-				    const char* purchase_id = paymentservice_event_get_purchase_id(event, 0);
-
-				    fprintf(stderr, "Purchase success. Request Id: %d\n Date: %s\n DigitalGoodID: %s\n SKU: %s\n License: %s\n Metadata: %s\n PurchaseId: %s\n\n",
-				        request_id,
-				        date ? date : "N/A",
-				        digital_good ? digital_good : "N/A",
-				        digital_sku ? digital_sku : "N/A",
-				        license_key ? license_key : "N/A",
-				        metadata ? metadata : "N/A",
-				        purchase_id ? purchase_id : "N/A");
-
-					break;
-				}
-				else
-				{
-					// Handle a successful query for past purchases here
-					int numPurchases = paymentservice_event_get_number_purchases(event);
-					fprintf(stderr, "Handle a successful query for past purchases here");
-
-					break;
-				}
-	        }
-	        else
-	        {
-			    if (event == NULL)
-			    {
-			        fprintf(stderr, "Invalid event.\n");
-			        break;
-			    }
-
-			    unsigned request_id = paymentservice_event_get_request_id(event);
-			    int error_id = paymentservice_event_get_error_id(event);
-			    const char *error_text = paymentservice_event_get_error_text(event);
-
-			    fprintf(stderr, "Payment System error. Request ID: %d  Error ID: %d  Text: %s\n",
-			            request_id, error_id, error_text ? error_text : "N/A");
-				break;
-	        }
-	    }
-
 	}
 
 	return true;

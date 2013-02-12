@@ -48,27 +48,13 @@ typedef struct
 	string price;
 	int error_id;
 	string error_text;
-	int request_id;
 } CCPaymentInfo;
 
-typedef void (CCPaymentUtil::*PurchaseSuccess)(CCPaymentInfo *);
-typedef void (CCPaymentUtil::*PaymentError)(CCPaymentInfo *);
-typedef void (CCPaymentUtil::*PriceResponse)(string);
-typedef void (CCPaymentUtil::*ExistingPurchasesResponse)(CCPaymentInfo *);
 
 class CC_DLL CCPaymentUtil {
 public:
 	CCPaymentUtil();
 	static CCPaymentUtil* sharedPaymentUtil(void);
-
-	int RequestPurchase(char* good_id, char* good_name, char* good_sku, char* mdata, char* app_icon, char* appname);
-	int RequestPrice(char* good_id, char* good_sku);
-	int RequestExisting();
-
-	PurchaseSuccess successCallback;
-	PaymentError errorCallback;
-	PriceResponse priceCallback;
-	ExistingPurchasesResponse existingCallback;
 
 	virtual ~CCPaymentUtil();
 };

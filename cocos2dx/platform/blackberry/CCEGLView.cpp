@@ -33,6 +33,7 @@ THE SOFTWARE.
 #include "CCGL.h"
 #include "CCAccelerometer.h"
 #include "CCApplication.h"
+#include "CCPaymentUtil.h"
 
 #include <ctype.h>
 #include <input/screen_helpers.h>
@@ -45,6 +46,7 @@ THE SOFTWARE.
 #include <bps/orientation.h>
 #include <bps/sensor.h>
 #include <bps/virtualkeyboard.h>
+#include <bps/paymentservice.h>
 
 #include <stdlib.h>
 
@@ -85,6 +87,7 @@ CCEGLView::CCEGLView()
     snprintf(m_windowGroupID, sizeof(m_windowGroupID), "%d", getpid());
     bps_initialize();
     navigator_request_events(0);
+    paymentservice_request_events(0);
 
     static const int SENSOR_RATE = 25000;
     sensor_set_rate(SENSOR_TYPE_ACCELEROMETER, SENSOR_RATE);
@@ -768,6 +771,134 @@ bool CCEGLView::handleEvents()
                 sensor_event_get_xyz(event, &x, &y, &z);
                 CCDirector::sharedDirector()->getAccelerometer()->update(current_time, -x, -y, z);
             }
+        }
+        else if (domain == paymentservice_get_domain())
+        {
+        	int code;
+    		code = paymentservice_event_get_response_code(event);
+    		if (SUCCESS_RESPONSE == code)
+    		{
+
+    			code = bps_event_get_code(event);
+    			if (PURCHASE_RESPONSE == code)
+    			{
+    				// Handle a successful purchase here
+    			    unsigned request_id = paymentservice_event_get_request_id(event);
+
+    			    CCPurchaseInfo pinfo;
+
+    			    pinfo.date = paymentservice_event_get_date(event, 0);
+    			    pinfo.digital_good_id = paymentservice_event_get_digital_good_id(event, 0);
+    			    pinfo.digital_good_sku = paymentservice_event_get_digital_good_sku(event, 0);
+    			    pinfo.license_key = paymentservice_event_get_license_key(event, 0);
+    			    pinfo.metadata = paymentservice_event_get_metadata(event, 0);
+    			    pinfo.purchase_id = paymentservice_event_get_purchase_id(event, 0);
+
+    			    fprintf(stderr, "Purchase success. Request Id: %d\n Date: %s\n DigitalGoodID: %s\n SKU: %s\n License: %s\n Metadata: %s\n PurchaseId: %s\n\n",
+    			        request_id,
+    			        date ? date : "N/A",
+    			        digital_good ? digital_good : "N/A",
+    			        digital_sku ? digital_sku : "N/A",
+    			        license_key ? license_key : "N/A",
+    			        metadata ? metadata : "N/A",
+    			        purchase_id ? purchase_id : "N/A");
+
+    			    if(strncmp(digital_good, "20384411", 8) == 0)
+    			    {
+    			    	CCSize winsize = CCDirector::sharedDirector()->getVisibleSize();
+    					Player::instance->melodaeum_premium = true;
+    					Player::instance->loadSavePlayerFile("./data/playerState.xml", false);
+    					CCMenuItemImage *pBackItem = CCMenuItemImage::create(
+    							"success.png", "success.png", this,
+    							menu_selector(PurchaseLayer::menuCloseCallback));
+    					pBackItem->setPosition(ccp(winsize.width*0.5, winsize.height*0.5));
+    					menu->addChild(pBackItem);
+    					loadingRing->setVisible(false);
+    			    }
+
+    			}
+    			if (GET_PRICE_RESPONSE == code)
+    			{
+    				priceLabel = CCLabelTTF::create("Price", "Myriad Pro", 48);
+    				CCSize winsize = CCDirector::sharedDirector()->getVisibleSize();
+    				CCPoint origin = CCDirector::sharedDirector()->getVisibleOrigin();
+
+    				priceLabel->setPosition(ccp(winsize.width*0.35, winsize.height*0.3));
+    				addChild(priceLabel);
+
+    				const char* priceText = paymentservice_event_get_price(event);
+    				priceLabel->setString(priceText);
+    				loadingRing->setVisible(false);
+
+    			}
+    			if (GET_EXISTING_PURCHASES_RESPONSE == code)
+    			{
+    				int count = paymentservice_event_get_number_purchases(event);
+
+    				if(count > 0)
+    				{
+    					for(int i = 0; i < count; i++)
+    					{
+    						if((strncmp(paymentservice_event_get_digital_good_id(event, i), "20384411", strlen("20384411")) == 0) ||
+    						   (strncmp(paymentservice_event_get_digital_good_sku(event, i), "20384411", strlen("20384411")) == 0))
+    						{
+
+    							CCSize winsize = CCDirector::sharedDirector()->getVisibleSize();
+    							CCPoint origin = CCDirector::sharedDirector()->getVisibleOrigin();
+
+    							Player::instance->melodaeum_premium = true;
+    							Player::instance->loadSavePlayerFile("./data/playerState.xml", false);
+    							CCMenuItemImage *pBackItem = CCMenuItemImage::create(
+    									"success.png", "success.png", this,
+    									menu_selector(PurchaseLayer::menuCloseCallback));
+    							pBackItem->setPosition(ccp(winsize.width*0.5, winsize.height*0.5));
+    							menu->addChild(pBackItem);
+
+    							CCLabelTTF *label = CCLabelTTF::create("You already bought this!", "Myriad Pro", 24);
+    							label->setPosition(ccp(winsize.width*0.5, winsize.height*0.25));
+    							menu->addChild(label);
+    							loadingRing->setVisible(false);
+    							break;
+    						}
+
+    					}
+    				}
+    				else
+    				{
+    					fprintf(stderr, "No existing purchases.\n");
+    				    fflush(stderr);
+
+    				}
+    			}
+
+    		}
+    		else
+    		{
+    		    unsigned request_id = paymentservice_event_get_request_id(event);
+    		    int error_id = paymentservice_event_get_error_id(event);
+    		    const char* error_text = paymentservice_event_get_error_text(event);
+
+    		    CCSize winsize = CCDirector::sharedDirector()->getVisibleSize();
+    			CCMenuItemImage *pErrItem = CCMenuItemImage::create(
+    					"error.png", "error.png", this,
+    					menu_selector(PurchaseLayer::menuCloseCallback));
+    			pErrItem->setPosition(ccp(winsize.width*0.5, winsize.height*0.5));
+    			menu->addChild(pErrItem);
+
+    			loadingRing->setVisible(false);
+    			purchaseImage->setVisible(false);
+    			if(priceLabel) priceLabel->setVisible(false);
+    			if(error_text)
+    			{
+    				CCLabelTTF *elabel = CCLabelTTF::create(error_text, "Myriad Pro", 24);
+    				elabel->setPosition(ccp(winsize.width*0.5, winsize.height*0.25));
+    				addChild(elabel);
+    			}
+    		    fprintf(stderr, "Payment System error. Request ID: %d  Error ID: %d  Text: %s\n",
+    		            request_id, error_id, error_text ? error_text : "N/A");
+    		    fflush(stderr);
+    		}
+
         }
 	}
 
